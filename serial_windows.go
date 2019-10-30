@@ -140,8 +140,27 @@ func (p *Port) Flush() error {
 	return purgeComm(p.fd)
 }
 
+func (p *Port) SetRTS(rts RTS) error {
+	var params structDCB
+	params.DCBlength = uint32(unsafe.Sizeof(params))
+
+	if r, _, err := syscall.Syscall(nGetCommState, 2, uintptr(p.fd), uintptr(unsafe.Pointer(&params)), 0); r == 0 {
+		return err
+	}
+
+	params.flags[1] &= 0xcf
+	params.flags[1] |= byte(rts) << 4
+
+	if r, _, err := syscall.Syscall(nSetCommState, 2, uintptr(p.fd), uintptr(unsafe.Pointer(&params)), 0); r == 0 {
+		return err
+	}
+
+	return nil
+}
+
 var (
 	nSetCommState,
+	nGetCommState,
 	nSetCommTimeouts,
 	nSetCommMask,
 	nSetupComm,
@@ -160,6 +179,7 @@ func init() {
 	defer syscall.FreeLibrary(k32)
 
 	nSetCommState = getProcAddr(k32, "SetCommState")
+	nGetCommState = getProcAddr(k32, "GetCommState")
 	nSetCommTimeouts = getProcAddr(k32, "SetCommTimeouts")
 	nSetCommMask = getProcAddr(k32, "SetCommMask")
 	nSetupComm = getProcAddr(k32, "SetupComm")
